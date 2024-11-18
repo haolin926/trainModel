@@ -5,12 +5,14 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV3Large
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 from tensorflow import keras
 from tensorflow import device
 
-IMG_FILE_PATH = "../input/food41/images/"
+IMG_FILE_PATH = "/home/hao/dataset/food101/images/"
 META_PATH = "/home/hao/dataset/food101/meta/meta/"
 
 # load data
@@ -111,7 +113,7 @@ def train():
     # Define callbacks
     reduce_lr = ReduceLROnPlateau(monitor = 'val_accuracy',patience = 1,verbose = 1)
     early_stop = EarlyStopping(monitor = 'val_accuracy',patience = 5,verbose = 1,restore_best_weights = True)
-    chkp = ModelCheckpoint('mobilenet_v3_large_checkpoint.keras',monitor='val_accuracy',verbose=1,save_best_only=True)
+    chkp = ModelCheckpoint('mobilenet_v3_large_checkpoint.h5',monitor='val_accuracy',verbose=1,save_best_only=True)
 
     # Train the model
     with device('/GPU:0'):
