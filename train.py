@@ -4,12 +4,12 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV3Large
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 from tensorflow import keras
+from tensorflow import device
 
 train_dir = "/home/hao/dataset/food101/train"
 test_dir = "/home/hao/dataset/food101/test"
@@ -70,16 +70,17 @@ def train():
         )
 
     # Define callbacks
-    reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor = 'val_accuracy',patience = 1,verbose = 1)
-    early_stop = keras.callbacks.EarlyStopping(monitor = 'val_accuracy',patience = 5,verbose = 1,restore_best_weights = True)
-    model_checkpoint = keras.callbacks.ModelCheckpoint('mobilenet_v3_large_checkpoint.keras',monitor='val_accuracy',verbose=1,save_best_only=True)
+    reduce_lr = ReduceLROnPlateau(monitor = 'val_accuracy',patience = 1,verbose = 1)
+    early_stop = EarlyStopping(monitor = 'val_accuracy',patience = 5,verbose = 1,restore_best_weights = True)
+    model_checkpoint = ModelCheckpoint('mobilenet_v3_large_checkpoint.keras',monitor='val_accuracy',verbose=1,save_best_only=True)
 
     # Train the model
-    history = model.fit(
-        train_generator,
-        validation_data=validation_generator,
-        epochs=20,
-        callbacks=[early_stop, reduce_lr, model_checkpoint]
+    with device('/device:GPU:0'):
+        history = model.fit(
+            train_generator,
+            validation_data=validation_generator,
+            epochs=20,
+            callbacks=[early_stop, reduce_lr, model_checkpoint]
     )
     
     model.save('best_model.keras')
