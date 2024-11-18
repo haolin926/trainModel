@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -84,6 +85,8 @@ def train():
     )
     
     model.save('best_model.keras')
+    with open('hisory.json', 'w') as f:
+        json.dump(history.history, f)
     
 def load_trained_model():
     model = load_model('best_model.keras')
