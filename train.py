@@ -14,7 +14,7 @@ from tensorflow import device
 
 train_dir = "/home/hao/dataset/food101/train"
 test_dir = "/home/hao/dataset/food101/test"
-META_PATH = "/home/hao/dataset/food101/meta/meta"
+META_PATH = "/home/hao/dataset/food101/meta/meta/"
 classes = pd.read_csv(META_PATH+'classes.txt', header=None)
 labels = pd.read_csv(META_PATH+'labels.txt', header=None)
 # Create ImageDataGenerator instances
