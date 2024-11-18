@@ -5,108 +5,125 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV3Large
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 from tensorflow import keras
 from tensorflow import device
 
-train_dir = "/home/hao/dataset/food101/train"
-test_dir = "/home/hao/dataset/food101/test"
+IMG_FILE_PATH = "../input/food41/images/"
 META_PATH = "/home/hao/dataset/food101/meta/meta/"
+
+# load data
 classes = pd.read_csv(META_PATH+'classes.txt', header=None)
 labels = pd.read_csv(META_PATH+'labels.txt', header=None)
+class_to_norminal = dict(zip(classes[0].values, range(classes.shape[0])))
+
+train_df = pd.read_csv(META_PATH+'train.txt', names=['txt'], header=None)
+train_df['img'] = train_df['txt'].apply(lambda x : x+'.jpg')
+train_df['label'] = train_df['txt'].apply(lambda x: class_to_norminal[x.split('/')[0]])
+
+train_df.drop(['txt'], axis=1, inplace=True)
+train_df = train_df.sample(frac=1)
+
+valid_df = pd.read_csv(META_PATH+'test.txt', names=['txt'], header=None)
+valid_df['img'] = valid_df['txt'].apply(lambda x: x+'.jpg')
+valid_df['label'] = valid_df['txt'].apply(lambda x: class_to_norminal[x.split('/')[0]])
+
+valid_df.drop(['txt'], axis=1, inplace=True)
+valid_df = valid_df.sample(frac=1)
+
 # Create ImageDataGenerator instances
-train_datagen = ImageDataGenerator(
-    rescale=1.0/255,
-    rotation_range=30,
-    shear_range=0.3,
-    horizontal_flip=True,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    zoom_range=0.25,
+train_dg = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=30,
+        shear_range=0.3,
+        horizontal_flip=True,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        zoom_range=0.25,
 )
 
-test_datagen = ImageDataGenerator(rescale=1.0/255)
+valid_dg = ImageDataGenerator(
+        rescale=1./255,
+)
 
 # Load images using flow_from_directory
-train_generator = train_datagen.flow_from_directory(
-    train_dir,
-    target_size=(224, 224),
-    batch_size=32,
-    class_mode='categorical',
-    shuffle=True
+train_dg = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=30,
+        shear_range=0.3,
+        horizontal_flip=True,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        zoom_range=0.25,
 )
 
-validation_generator = test_datagen.flow_from_directory(
-    test_dir,
-    target_size=(224, 224),
-    batch_size=32,
-    class_mode='categorical',
-    shuffle=True
+valid_dg = ImageDataGenerator(
+        rescale=1./255,
 )
 
+BATCH_SIZE = 64
+IMAGE_SIZE = 224
+
+train_data = train_dg.flow_from_dataframe(
+    dataframe=train_df,
+    directory=IMG_FILE_PATH,
+    x_col="img",
+    y_col="label",
+    target_size=(IMAGE_SIZE, IMAGE_SIZE),
+    batch_size=BATCH_SIZE,
+    class_mode="raw",
+    shuffle=True,
+)
+valid_data = valid_dg.flow_from_dataframe(
+    dataframe=valid_df,
+    directory=IMG_FILE_PATH,
+    x_col="img",
+    y_col="label",
+    target_size=(IMAGE_SIZE, IMAGE_SIZE),
+    batch_size=BATCH_SIZE,
+    class_mode="raw",
+    shuffle=True,
+)
 
 def train():
     # Load MobileNetV3 with ImageNet weights, without the top layer
-    base_model = MobileNetV3Large(weights='imagenet', include_top=False,  input_shape=(224, 224, 3))
-
-    # Freeze the base model layers
-    base_model.trainable = False
+    pre_trained = MobileNetV3Large(input_shape=(IMAGE_SIZE,IMAGE_SIZE,3),include_top=False,weights='imagenet')
     
+    # Freeze the base model
+    pre_trained.trainable = True
+
     model = keras.Sequential([
-    base_model,
+    pre_trained,
     GlobalAveragePooling2D(),
     Dense(128, activation='relu'),
     Dropout(0.5),
     Dense(101, activation='softmax'),
-])
+    ])
 
     # Compile the model
     model.compile(
-        optimizer=Adam(),
-        loss='categorical_crossentropy',
+        optimizer='adam',
+        loss = 'sparse_categorical_crossentropy',
         metrics=['accuracy']
-        )
+    )
 
     # Define callbacks
     reduce_lr = ReduceLROnPlateau(monitor = 'val_accuracy',patience = 1,verbose = 1)
     early_stop = EarlyStopping(monitor = 'val_accuracy',patience = 5,verbose = 1,restore_best_weights = True)
-    model_checkpoint = ModelCheckpoint('mobilenet_v3_large_checkpoint.keras',monitor='val_accuracy',verbose=1,save_best_only=True)
+    chkp = ModelCheckpoint('mobilenet_v3_large_checkpoint.h5',monitor='val_accuracy',verbose=1,save_best_only=True)
 
     # Train the model
-    with device('/device:GPU:0'):
-        history = model.fit(
-            train_generator,
-            validation_data=validation_generator,
-            epochs=20,
-            callbacks=[early_stop, reduce_lr, model_checkpoint]
+    with device('/GPU:0'):
+        hist = model.fit(
+        train_data,
+        validation_data = valid_data,
+        epochs = 20,
+        callbacks=[early_stop, reduce_lr, chkp],
     )
     
     model.save('best_model.keras')
     with open('hisory.json', 'w') as f:
-        json.dump(history.history, f)
+        json.dump(hist.history, f)
     
-def load_trained_model():
-    model = load_model('best_model.keras')
-    
-    # For example, to evaluate on the validation set:
-    loss, accuracy = model.evaluate(validation_generator)
-    print(f'Validation accuracy: {accuracy:.4f}')
-    print(f'Validation loss: {loss:.4f}')
-
-def showData():
-    x, y = next(train_generator)
-    fig, ax = plt.subplots(nrows=5, ncols=5, figsize=(15,15))
-
-    for i in range(5):
-        for j in range(5):
-            ax[i][j].imshow(x[i+j*5])
-            ax[i][j].set_title(labels[0][y[i+j*5]])
-            ax[i][j].set_xticks([])
-            ax[i][j].set_yticks([])
-    
-    fig.show()
-    wait = input("PRESS ENTER TO CONTINUE.")
 train()
