@@ -11,9 +11,9 @@ from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
 from tensorflow import keras
 
-train_dir = r"D:\FYP_DATA\food101\train"
-test_dir = r"D:\FYP_DATA\food101\test"
-META_PATH = "D:/FYP_DATA/food101/meta/meta/"
+train_dir = "/home/hao/dataset/food101/train"
+test_dir = "/home/hao/dataset/food101/test"
+META_PATH = "/home/hao/dataset/food101/meta/meta"
 classes = pd.read_csv(META_PATH+'classes.txt', header=None)
 labels = pd.read_csv(META_PATH+'labels.txt', header=None)
 # Create ImageDataGenerator instances
